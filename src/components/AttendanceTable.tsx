@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -194,9 +195,7 @@ function AttendanceTableComponent() {
                   handleCheckIn(row.original._id, checked === true)
                 }
                 disabled={isPending}
-                className={
-                  isPending ? "border-2 border-yellow-500 animate-pulse" : ""
-                }
+                className={`h-6 w-6 ${isPending ? "border-2 border-yellow-500 animate-pulse" : ""}`}
               />
               {isPending && (
                 <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-yellow-500 animate-ping" />
@@ -329,71 +328,67 @@ function AttendanceTableComponent() {
     },
   });
 
-  return (
-    <div className="space-y-6">
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Total</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats?.total ?? 0}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Present</CardTitle>
-            <UserCheck className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats?.present ?? 0}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Absent</CardTitle>
-            <UserX className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats?.absent ?? 0}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Attendance</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats?.percentage ?? 0}%</div>
-          </CardContent>
-        </Card>
-      </div>
+  // Portal target for stats in header
+  const [statsPortal, setStatsPortal] = useState<HTMLElement | null>(null);
 
-      {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Filter className="h-4 w-4" />
-            Filters
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-4">
-            <div className="flex-1 min-w-48">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search by name or contact no..."
-                  value={globalFilter}
-                  onChange={(e) => setGlobalFilter(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
+  useEffect(() => {
+    const portal = document.getElementById("stats-portal");
+    setStatsPortal(portal);
+  }, []);
+
+  const statsContent = (
+    <div className="flex items-center gap-4 sm:gap-6">
+      <div className="flex items-center gap-1">
+        <span className="text-xl sm:text-2xl font-bold">
+          {stats?.total ?? 0}
+        </span>
+        <span className="text-xs text-muted-foreground uppercase">Total</span>
+      </div>
+      <div className="h-6 w-px bg-border" />
+      <div className="flex items-center gap-1">
+        <span className="text-xl sm:text-2xl font-bold text-green-500">
+          {stats?.present ?? 0}
+        </span>
+        <span className="text-xs text-muted-foreground uppercase">Present</span>
+      </div>
+      <div className="h-6 w-px bg-border" />
+      <div className="flex items-center gap-1">
+        <span className="text-xl sm:text-2xl font-bold text-red-400">
+          {stats?.absent ?? 0}
+        </span>
+        <span className="text-xs text-muted-foreground uppercase">Absent</span>
+      </div>
+      <div className="h-6 w-px bg-border hidden sm:block" />
+      <div className="hidden sm:flex items-center gap-1">
+        <span className="text-xl sm:text-2xl font-bold">
+          {stats?.percentage ?? 0}%
+        </span>
+        <span className="text-xs text-muted-foreground uppercase">Rate</span>
+      </div>
+    </div>
+  );
+
+  return (
+    <>
+      {/* Portal stats into header */}
+      {statsPortal && createPortal(statsContent, statsPortal)}
+
+      <div className="space-y-6">
+        {/* Search and Filters Bar */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by name or contact..."
+              value={globalFilter}
+              onChange={(e) => setGlobalFilter(e.target.value)}
+              className="pl-10 h-10"
+            />
+          </div>
+          <div className="flex gap-2 items-center">
             <Select value={courseFilter} onValueChange={setCourseFilter}>
-              <SelectTrigger className="w-44">
-                <SelectValue placeholder="All Courses" />
+              <SelectTrigger className="w-36 h-10">
+                <SelectValue placeholder="Course" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Courses</SelectItem>
@@ -405,8 +400,8 @@ function AttendanceTableComponent() {
               </SelectContent>
             </Select>
             <Select value={batchFilter} onValueChange={setBatchFilter}>
-              <SelectTrigger className="w-44">
-                <SelectValue placeholder="All Batches" />
+              <SelectTrigger className="w-32 h-10">
+                <SelectValue placeholder="Batch" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Batches</SelectItem>
@@ -423,198 +418,206 @@ function AttendanceTableComponent() {
                 setShowFilter(v as "all" | "present" | "absent")
               }
             >
-              <SelectTrigger className="w-44">
-                <SelectValue placeholder="Show All" />
+              <SelectTrigger className="w-36 h-10">
+                <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Show All</SelectItem>
-                <SelectItem value="present">Present Only</SelectItem>
-                <SelectItem value="absent">Absent Only</SelectItem>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="present">Present</SelectItem>
+                <SelectItem value="absent">Absent</SelectItem>
               </SelectContent>
             </Select>
           </div>
-        </CardContent>
-      </Card>
+        </div>
 
-      {/* Attendance Table */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-base">
-            Attendees ({table.getFilteredRowModel().rows.length})
-          </CardTitle>
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Attendee
-              </Button>
-            </DialogTrigger>
-            <DialogContent onKeyDown={handleKeyDown}>
-              <DialogHeader>
-                <DialogTitle>Add New Attendee</DialogTitle>
-                <DialogDescription>
-                  Manually add a new attendee to the list.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="fullName">Full Name *</Label>
-                  <Input
-                    id="fullName"
-                    placeholder="e.g., Amandeep Bhasin"
-                    value={newAttendee.fullName}
-                    onChange={(e) =>
-                      setNewAttendee({
-                        ...newAttendee,
-                        fullName: e.target.value,
-                      })
-                    }
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="course">Course *</Label>
-                    <Input
-                      id="course"
-                      placeholder="e.g., BCA"
-                      value={newAttendee.course}
-                      onChange={(e) =>
-                        setNewAttendee({
-                          ...newAttendee,
-                          course: e.target.value,
-                        })
-                      }
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="batch">Batch *</Label>
-                    <Input
-                      id="batch"
-                      placeholder="e.g., 1999"
-                      value={newAttendee.batch}
-                      onChange={(e) =>
-                        setNewAttendee({
-                          ...newAttendee,
-                          batch: e.target.value,
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="shift">Shift</Label>
-                    <Input
-                      id="shift"
-                      placeholder="e.g., Morning (optional)"
-                      value={newAttendee.shift}
-                      onChange={(e) =>
-                        setNewAttendee({
-                          ...newAttendee,
-                          shift: e.target.value,
-                        })
-                      }
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="contactNo">Contact No.</Label>
-                    <Input
-                      id="contactNo"
-                      placeholder="e.g., 99999978322 (optional)"
-                      value={newAttendee.contactNo}
-                      onChange={(e) =>
-                        setNewAttendee({
-                          ...newAttendee,
-                          contactNo: e.target.value,
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button
-                  variant="outline"
-                  onClick={() => setIsAddDialogOpen(false)}
-                >
-                  Cancel
+        {/* Attendees Table */}
+        <div className="rounded-xl border bg-card overflow-hidden">
+          <div className="px-6 py-4 border-b flex items-center justify-between">
+            <h2 className="font-semibold">
+              Attendees
+              <span className="ml-2 text-muted-foreground font-normal">
+                ({table.getFilteredRowModel().rows.length})
+              </span>
+            </h2>
+            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm" className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  Add Attendee
                 </Button>
-                <Button onClick={handleAddAttendee} disabled={isAdding}>
-                  {isAdding ? "Adding..." : "Add Attendee"}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </CardHeader>
-        <CardContent>
-          <div className="border rounded-lg overflow-hidden">
-            <Table>
-              <TableHeader>
-                {table.getHeaderGroups().map((headerGroup) => (
-                  <TableRow key={headerGroup.id}>
-                    {headerGroup.headers.map((header) => (
-                      <TableHead
-                        key={header.id}
-                        style={{ width: header.getSize() }}
-                      >
-                        {header.isPlaceholder
-                          ? null
-                          : flexRender(
-                              header.column.columnDef.header,
-                              header.getContext(),
-                            )}
-                      </TableHead>
+              </DialogTrigger>
+              <DialogContent onKeyDown={handleKeyDown}>
+                <DialogHeader>
+                  <DialogTitle>Add New Attendee</DialogTitle>
+                  <DialogDescription>
+                    Manually add a new attendee to the list.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="fullName">Full Name *</Label>
+                    <Input
+                      id="fullName"
+                      placeholder="e.g., Amandeep Bhasin"
+                      value={newAttendee.fullName}
+                      onChange={(e) =>
+                        setNewAttendee({
+                          ...newAttendee,
+                          fullName: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="course">Course *</Label>
+                      <Input
+                        id="course"
+                        placeholder="e.g., BCA"
+                        value={newAttendee.course}
+                        onChange={(e) =>
+                          setNewAttendee({
+                            ...newAttendee,
+                            course: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="batch">Batch *</Label>
+                      <Input
+                        id="batch"
+                        placeholder="e.g., 1999"
+                        value={newAttendee.batch}
+                        onChange={(e) =>
+                          setNewAttendee({
+                            ...newAttendee,
+                            batch: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="shift">Shift</Label>
+                      <Input
+                        id="shift"
+                        placeholder="e.g., Morning (optional)"
+                        value={newAttendee.shift}
+                        onChange={(e) =>
+                          setNewAttendee({
+                            ...newAttendee,
+                            shift: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="contactNo">Contact No.</Label>
+                      <Input
+                        id="contactNo"
+                        placeholder="e.g., 99999978322 (optional)"
+                        value={newAttendee.contactNo}
+                        onChange={(e) =>
+                          setNewAttendee({
+                            ...newAttendee,
+                            contactNo: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsAddDialogOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button onClick={handleAddAttendee} disabled={isAdding}>
+                    {isAdding ? "Adding..." : "Add Attendee"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
+          <Table>
+            <TableHeader>
+              {table.getHeaderGroups().map((headerGroup) => (
+                <TableRow key={headerGroup.id} className="hover:bg-transparent">
+                  {headerGroup.headers.map((header) => (
+                    <TableHead
+                      key={header.id}
+                      style={{ width: header.getSize() }}
+                      className="h-12 px-6"
+                    >
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(
+                            header.column.columnDef.header,
+                            header.getContext(),
+                          )}
+                    </TableHead>
+                  ))}
+                </TableRow>
+              ))}
+            </TableHeader>
+            <TableBody>
+              {attendees === undefined ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={columns.length}
+                    className="text-center py-16"
+                  >
+                    <div className="flex flex-col items-center justify-center gap-3 text-muted-foreground">
+                      <Loader2 className="h-8 w-8 animate-spin" />
+                      <span>Loading attendees...</span>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : table.getRowModel().rows.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={columns.length}
+                    className="text-center py-16"
+                  >
+                    <div className="flex flex-col items-center gap-3 text-muted-foreground">
+                      <Users className="h-12 w-12 opacity-20" />
+                      <div>
+                        <p className="font-medium">No attendees found</p>
+                        <p className="text-sm mt-1">
+                          {attendees?.length === 0
+                            ? "Add attendees manually or import a CSV from the Admin page."
+                            : "Try adjusting your filters."}
+                        </p>
+                      </div>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                table.getRowModel().rows.map((row) => (
+                  <TableRow
+                    key={row.id}
+                    className={`transition-colors ${row.original.isPresent ? "bg-green-500/5 hover:bg-green-500/10" : "hover:bg-muted/50"}`}
+                  >
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell key={cell.id} className="px-6 py-4">
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext(),
+                        )}
+                      </TableCell>
                     ))}
                   </TableRow>
-                ))}
-              </TableHeader>
-              <TableBody>
-                {attendees === undefined ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={columns.length}
-                      className="text-center py-8"
-                    >
-                      <div className="flex items-center justify-center gap-2 text-muted-foreground">
-                        <Loader2 className="h-5 w-5 animate-spin" />
-                        Loading attendees...
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ) : table.getRowModel().rows.length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={columns.length}
-                      className="text-center py-8 text-muted-foreground"
-                    >
-                      {attendees?.length === 0
-                        ? "No attendees found. Add attendees manually or import a CSV from the Admin page."
-                        : "No matching attendees found."}
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  table.getRowModel().rows.map((row) => (
-                    <TableRow
-                      key={row.id}
-                      className={row.original.isPresent ? "bg-muted/50" : ""}
-                    >
-                      {row.getVisibleCells().map((cell) => (
-                        <TableCell key={cell.id}>
-                          {flexRender(
-                            cell.column.columnDef.cell,
-                            cell.getContext(),
-                          )}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+    </>
   );
 }
 

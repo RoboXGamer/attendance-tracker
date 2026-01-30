@@ -5,12 +5,18 @@ import AttendanceTable from "../components/AttendanceTable";
 
 <Base title="Attendance Tracker">
   <div class="min-h-screen bg-background">
-    <header class="border-b">
-      <div class="container mx-auto px-4 py-4">
-        <h1 class="text-2xl font-bold">Event Attendance</h1>
+    <header class="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50">
+      <div class="container mx-auto px-6 py-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <h1 class="text-xl font-bold tracking-tight">Event Attendance</h1>
+            <p class="text-xs text-muted-foreground mt-0.5">Track and manage attendee check-ins</p>
+          </div>
+          <div id="stats-portal"></div>
+        </div>
       </div>
     </header>
-    <main class="container mx-auto px-4 py-8">
+    <main class="container mx-auto px-6 py-6">
       <AttendanceTable client:load />
     </main>
   </div>
