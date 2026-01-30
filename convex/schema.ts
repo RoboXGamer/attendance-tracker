@@ -10,7 +10,6 @@ const schema = defineSchema({
     contactNo: v.optional(v.string()),
     isPresent: v.boolean(),
     checkedInAt: v.optional(v.number()),
-    checkedInBy: v.optional(v.string()),
   })
     .index("by_course", ["course"])
     .index("by_batch", ["batch"])

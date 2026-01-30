@@ -1,25 +1,19 @@
 ---
 import Base from "../layouts/Base.astro";
-import CSVImport from "../components/CSVImport";
+import PrintList from "../components/PrintList";
 ---
 
-<Base title="Admin - Attendance Tracker">
+<Base title="Print List - Attendance Tracker">
   <div class="min-h-screen bg-background">
     <header class="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50">
       <div class="container mx-auto px-6 py-4">
         <div class="flex items-center justify-between">
           <div>
-            <h1 class="text-xl font-bold tracking-tight">Admin Panel</h1>
-            <p class="text-xs text-muted-foreground mt-0.5">Manage attendees and import data</p>
+            <h1 class="text-xl font-bold tracking-tight">Print List</h1>
+            <p class="text-xs text-muted-foreground mt-0.5">Select attendees and export to PDF for printing</p>
           </div>
           <div class="flex items-center gap-4">
-            <div id="admin-stats-portal"></div>
-            <a
-              href="/print"
-              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
-            >
-              Print List
-            </a>
+            <div id="print-stats-portal"></div>
             <a
               href="/"
               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
@@ -31,8 +25,7 @@ import CSVImport from "../components/CSVImport";
       </div>
     </header>
     <main class="container mx-auto px-6 py-6">
-      <CSVImport client:load />
+      <PrintList client:load />
     </main>
   </div>
 </Base>
-
