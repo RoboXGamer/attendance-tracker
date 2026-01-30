@@ -1,0 +1,17 @@
+---
+import Base from "../layouts/Base.astro";
+import AttendanceTable from "../components/AttendanceTable";
+---
+
+<Base title="Attendance Tracker">
+  <div class="min-h-screen bg-background">
+    <header class="border-b">
+      <div class="container mx-auto px-4 py-4">
+        <h1 class="text-2xl font-bold">Event Attendance</h1>
+      </div>
+    </header>
+    <main class="container mx-auto px-4 py-8">
+      <AttendanceTable client:load />
+    </main>
+  </div>
+</Base>
