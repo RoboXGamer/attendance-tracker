@@ -92,6 +92,94 @@ function CSVImportComponent() {
     return matchesSearch && matchesCourse && matchesBatch && matchesPresence;
   });
 
+  // Normalize course name for grouping
+  const normalizeCourse = (course: string): string => {
+    if (!course) return "UNKNOWN";
+    let normalized = course.trim().toUpperCase();
+    // Remove extra spaces
+    normalized = normalized.replace(/\s+/g, " ");
+    // Normalize parentheses spacing: "BBA (G)" or "BBA(G)" -> "BBA (G)"
+    normalized = normalized
+      .replace(/\s*\(\s*/g, " (")
+      .replace(/\s*\)\s*/g, ")");
+
+    // Handle common variations (mappings checked AFTER normalization)
+    const mappings: Record<string, string> = {
+      BBA: "BBA (G)",
+      "BBA (G)": "BBA (G)",
+      "BBA GENERAL": "BBA (G)",
+      "BBA (B&I)": "BBA (B&I)",
+      "BCOM (HONS.)": "B.COM (HONS.)",
+      "BCOM (HONS)": "B.COM (HONS.)",
+      "BCOM HONS": "B.COM (HONS.)",
+      "B.ED.": "B.ED.",
+      "B.ED": "B.ED.",
+      "B. ED": "B.ED.",
+      "B. ED.": "B.ED.",
+      "BCA (E)": "BCA",
+      "BIS (HONS)": "BIS (HONS.)",
+      "BIS (HONS.)": "BIS (HONS.)",
+    };
+    return mappings[normalized] || normalized;
+  };
+
+  // Course-wise count (only present students, with normalized names)
+  const courseWiseCount = attendees
+    ?.filter((a) => a.isPresent)
+    .reduce(
+      (acc, attendee) => {
+        const normalizedCourse = normalizeCourse(attendee.course);
+        acc[normalizedCourse] = (acc[normalizedCourse] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
+
+  // Total present count from courseWiseCount for verification
+  const totalPresentFromCourses = courseWiseCount
+    ? Object.values(courseWiseCount).reduce((sum, count) => sum + count, 0)
+    : 0;
+
+  // Normalize batch year from various formats
+  const normalizeBatchYear = (batch: string): number | null => {
+    if (!batch) return null;
+
+    // Extract numbers from the string (handles "2016", "16", "Batch 2016", "2016-2020", etc.)
+    const numbers = batch.match(/\d+/g);
+    if (!numbers || numbers.length === 0) return null;
+
+    // Take the first number found
+    let year = parseInt(numbers[0], 10);
+    if (isNaN(year)) return null;
+
+    // Handle 2-digit years (16 -> 2016, 99 -> 1999)
+    if (year >= 0 && year <= 99) {
+      // Assume years 00-30 are 2000s, 31-99 are 1900s
+      if (year <= 30) {
+        year = 2000 + year;
+      } else {
+        year = 1900 + year;
+      }
+    }
+
+    // Validate reasonable year range (1980-2030)
+    if (year < 1980 || year > 2030) return null;
+
+    return year;
+  };
+
+  // Oldest batch year (with proper normalization)
+  const oldestBatch = attendees?.reduce(
+    (oldest, attendee) => {
+      const batchYear = normalizeBatchYear(attendee.batch);
+      if (batchYear !== null && (oldest === null || batchYear < oldest)) {
+        return batchYear;
+      }
+      return oldest;
+    },
+    null as number | null,
+  );
+
   const handleDeleteAttendee = async (id: Id<"attendees">, name: string) => {
     if (!confirm(`Are you sure you want to delete "${name}"?`)) return;
     try {
@@ -412,11 +500,13 @@ function CSVImportComponent() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Courses</SelectItem>
-                  {courses?.map((course) => (
-                    <SelectItem key={course} value={course}>
-                      {course}
-                    </SelectItem>
-                  ))}
+                  {courses
+                    ?.filter((course) => course && course.trim() !== "")
+                    .map((course) => (
+                      <SelectItem key={course} value={course}>
+                        {course}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
               <Select value={batchFilter} onValueChange={setBatchFilter}>
@@ -425,11 +515,13 @@ function CSVImportComponent() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Batches</SelectItem>
-                  {batches?.map((batch) => (
-                    <SelectItem key={batch} value={batch}>
-                      {batch}
-                    </SelectItem>
-                  ))}
+                  {batches
+                    ?.filter((batch) => batch && batch.trim() !== "")
+                    .map((batch) => (
+                      <SelectItem key={batch} value={batch}>
+                        {batch}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
               <Select
@@ -552,6 +644,77 @@ function CSVImportComponent() {
               <Trash2 className="h-4 w-4 mr-2" />
               Delete All Data
             </Button>
+          </CardContent>
+        </Card>
+
+        {/* Extra Stats Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Additional Statistics</CardTitle>
+            <CardDescription>
+              Course-wise breakdown and batch info
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Course-wise Count */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                  Course-wise Present Count
+                </h3>
+                {courseWiseCount && Object.keys(courseWiseCount).length > 0 ? (
+                  <div className="space-y-2">
+                    {Object.entries(courseWiseCount)
+                      .sort(([, a], [, b]) => b - a)
+                      .map(([course, count]) => (
+                        <div
+                          key={course}
+                          className="flex items-center justify-between p-2 rounded-md bg-muted/50"
+                        >
+                          <span className="font-medium">{course}</span>
+                          <span className="text-sm bg-primary/10 text-primary px-2 py-0.5 rounded">
+                            {count} {count === 1 ? "student" : "students"}
+                          </span>
+                        </div>
+                      ))}
+                    <div className="flex items-center justify-between p-2 rounded-md bg-primary/10 border border-primary/20 mt-2">
+                      <span className="font-semibold">Total Present</span>
+                      <span className="text-sm font-bold bg-primary text-primary-foreground px-2 py-0.5 rounded">
+                        {totalPresentFromCourses} students
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground text-sm">
+                    No data available
+                  </p>
+                )}
+              </div>
+
+              {/* Oldest Batch */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                  Oldest Batch Year
+                </h3>
+                {oldestBatch !== null ? (
+                  <div className="flex items-center gap-3 p-4 rounded-lg bg-muted/50">
+                    <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+                      <Users className="h-6 w-6 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold">{oldestBatch}</p>
+                      <p className="text-sm text-muted-foreground">
+                        Batch Year
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground text-sm">
+                    No batch data available
+                  </p>
+                )}
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>

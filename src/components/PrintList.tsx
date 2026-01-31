@@ -56,6 +56,60 @@ type Attendee = {
   checkedInAt?: number;
 };
 
+// Normalize course name for grouping
+const normalizeCourse = (course: string): string => {
+  if (!course) return "UNKNOWN";
+  let normalized = course.trim().toUpperCase();
+  normalized = normalized.replace(/\s+/g, " ");
+  normalized = normalized.replace(/\s*\(\s*/g, " (").replace(/\s*\)\s*/g, ")");
+
+  const mappings: Record<string, string> = {
+    BBA: "BBA (G)",
+    "BBA (G)": "BBA (G)",
+    "BBA GENERAL": "BBA (G)",
+    "BBA (B&I)": "BBA (B&I)",
+    "BCOM (HONS.)": "B.COM (HONS.)",
+    "BCOM (HONS)": "B.COM (HONS.)",
+    "BCOM HONS": "B.COM (HONS.)",
+    "B.ED.": "B.ED.",
+    "B.ED": "B.ED.",
+    "B. ED": "B.ED.",
+    "B. ED.": "B.ED.",
+    "BCA (E)": "BCA",
+    "BIS (HONS)": "BIS (HONS.)",
+    "BIS (HONS.)": "BIS (HONS.)",
+  };
+  return mappings[normalized] || normalized;
+};
+
+// Normalize batch year from various formats
+const normalizeBatchYear = (batch: string): number | null => {
+  if (!batch) return null;
+
+  const numbers = batch.match(/\d+/g);
+  if (!numbers || numbers.length === 0) return null;
+
+  let year = parseInt(numbers[0], 10);
+  if (isNaN(year)) return null;
+
+  if (year >= 0 && year <= 99) {
+    if (year <= 30) {
+      year = 2000 + year;
+    } else {
+      year = 1900 + year;
+    }
+  }
+
+  if (year < 1980 || year > 2030) return null;
+
+  return year;
+};
+
+const formatBatchYear = (batch: string): string => {
+  const year = normalizeBatchYear(batch);
+  return year ? year.toString() : batch;
+};
+
 function PrintListComponent() {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
@@ -66,6 +120,8 @@ function PrintListComponent() {
     "all",
   );
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const [sortColumn, setSortColumn] = useState<string>("fullName");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
 
   const attendees = useQuery(api.attendees.getAll);
   const courses = useQuery(api.attendees.getCourses);
@@ -91,6 +147,52 @@ function PrintListComponent() {
       return matchesCourse && matchesBatch && matchesShift && matchesShow;
     });
   }, [attendees, courseFilter, batchFilter, shiftFilter, showFilter]);
+
+  // Apply custom sorting for PDF export
+  const sortedDataForExport = useMemo(() => {
+    const data = [...filteredData];
+
+    data.sort((a, b) => {
+      let aVal: string | number | boolean;
+      let bVal: string | number | boolean;
+
+      switch (sortColumn) {
+        case "fullName":
+          aVal = a.fullName.toLowerCase();
+          bVal = b.fullName.toLowerCase();
+          break;
+        case "course":
+          aVal = normalizeCourse(a.course);
+          bVal = normalizeCourse(b.course);
+          break;
+        case "batch":
+          aVal = normalizeBatchYear(a.batch) ?? 9999;
+          bVal = normalizeBatchYear(b.batch) ?? 9999;
+          break;
+        case "shift":
+          aVal = (a.shift || "").toLowerCase();
+          bVal = (b.shift || "").toLowerCase();
+          break;
+        case "contactNo":
+          aVal = a.contactNo || "";
+          bVal = b.contactNo || "";
+          break;
+        case "isPresent":
+          aVal = a.isPresent ? 1 : 0;
+          bVal = b.isPresent ? 1 : 0;
+          break;
+        default:
+          aVal = a.fullName.toLowerCase();
+          bVal = b.fullName.toLowerCase();
+      }
+
+      if (aVal < bVal) return sortOrder === "asc" ? -1 : 1;
+      if (aVal > bVal) return sortOrder === "asc" ? 1 : -1;
+      return 0;
+    });
+
+    return data;
+  }, [filteredData, sortColumn, sortOrder]);
 
   const columns = useMemo<ColumnDef<Attendee>[]>(
     () => [
@@ -259,15 +361,29 @@ function PrintListComponent() {
 
   // Export to PDF function
   const handleExportPDF = () => {
+    // Use sorted data, then filter by selection if needed
     const dataToExport =
       selectedCount > 0
-        ? selectedRows.map((row) => row.original)
-        : filteredData;
+        ? sortedDataForExport.filter((a) =>
+            selectedRows.some((row) => row.original._id === a._id),
+          )
+        : sortedDataForExport;
 
     if (dataToExport.length === 0) {
       alert("No data to export");
       return;
     }
+
+    // Get sort description for subtitle
+    const sortColumnLabels: Record<string, string> = {
+      fullName: "Name",
+      course: "Course",
+      batch: "Batch",
+      shift: "Shift",
+      contactNo: "Contact",
+      isPresent: "Status",
+    };
+    const sortDescription = `Sorted by ${sortColumnLabels[sortColumn] || sortColumn} (${sortOrder === "asc" ? "A-Z" : "Z-A"})`;
 
     // Create a printable HTML document
     const printContent = `
@@ -279,7 +395,8 @@ function PrintListComponent() {
           * { margin: 0; padding: 0; box-sizing: border-box; }
           body { font-family: Arial, sans-serif; padding: 20px; }
           h1 { text-align: center; margin-bottom: 10px; font-size: 24px; }
-          .subtitle { text-align: center; margin-bottom: 20px; color: #666; font-size: 14px; }
+          .subtitle { text-align: center; margin-bottom: 5px; color: #666; font-size: 14px; }
+          .sort-info { text-align: center; margin-bottom: 15px; color: #888; font-size: 12px; }
           table { width: 100%; border-collapse: collapse; margin-top: 10px; }
           th, td { border: 1px solid #333; padding: 8px 12px; text-align: left; font-size: 12px; }
           th { background-color: #f0f0f0; font-weight: bold; }
@@ -297,6 +414,7 @@ function PrintListComponent() {
       <body>
         <h1>Attendance List</h1>
         <p class="subtitle">Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}</p>
+        <p class="sort-info">${sortDescription}</p>
         <div class="stats">
           <strong>Total:</strong> ${dataToExport.length} | 
           <strong>Present:</strong> ${dataToExport.filter((a) => a.isPresent).length} | 
@@ -321,9 +439,9 @@ function PrintListComponent() {
               <tr>
                 <td>${index + 1}</td>
                 <td>${attendee.fullName}</td>
-                <td>${attendee.course}</td>
+                <td>${normalizeCourse(attendee.course)}</td>
                 <td>${attendee.shift || "-"}</td>
-                <td>${attendee.batch}</td>
+                <td>${formatBatchYear(attendee.batch)}</td>
                 <td>${attendee.contactNo || "-"}</td>
                 <td class="${attendee.isPresent ? "status-present" : "status-absent"}">
                   ${attendee.isPresent ? "Present" : "Absent"}
@@ -401,11 +519,13 @@ function PrintListComponent() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Courses</SelectItem>
-                {courses?.map((course) => (
-                  <SelectItem key={course} value={course}>
-                    {course}
-                  </SelectItem>
-                ))}
+                {courses
+                  ?.filter((course) => course && course.trim() !== "")
+                  .map((course) => (
+                    <SelectItem key={course} value={course}>
+                      {course}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
             <Select value={batchFilter} onValueChange={setBatchFilter}>
@@ -414,11 +534,13 @@ function PrintListComponent() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Batches</SelectItem>
-                {batches?.map((batch) => (
-                  <SelectItem key={batch} value={batch}>
-                    {batch}
-                  </SelectItem>
-                ))}
+                {batches
+                  ?.filter((batch) => batch && batch.trim() !== "")
+                  .map((batch) => (
+                    <SelectItem key={batch} value={batch}>
+                      {batch}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
             <Select value={shiftFilter} onValueChange={setShiftFilter}>
@@ -427,11 +549,13 @@ function PrintListComponent() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Shifts</SelectItem>
-                {shifts?.map((shift) => (
-                  <SelectItem key={shift} value={shift}>
-                    {shift}
-                  </SelectItem>
-                ))}
+                {shifts
+                  ?.filter((shift) => shift && shift.trim() !== "")
+                  .map((shift) => (
+                    <SelectItem key={shift} value={shift}>
+                      {shift}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
             <Select
@@ -450,6 +574,38 @@ function PrintListComponent() {
               </SelectContent>
             </Select>
           </div>
+        </div>
+
+        {/* Sort Options for PDF Export */}
+        <div className="flex flex-wrap items-center gap-2 p-3 rounded-lg bg-muted/30 border">
+          <span className="text-sm font-medium text-muted-foreground">
+            Sort PDF by:
+          </span>
+          <Select value={sortColumn} onValueChange={setSortColumn}>
+            <SelectTrigger className="w-[130px] h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="fullName">Name</SelectItem>
+              <SelectItem value="course">Course</SelectItem>
+              <SelectItem value="batch">Batch Year</SelectItem>
+              <SelectItem value="shift">Shift</SelectItem>
+              <SelectItem value="contactNo">Contact</SelectItem>
+              <SelectItem value="isPresent">Status</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select
+            value={sortOrder}
+            onValueChange={(v) => setSortOrder(v as "asc" | "desc")}
+          >
+            <SelectTrigger className="w-[130px] h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="asc">Ascending (A-Z)</SelectItem>
+              <SelectItem value="desc">Descending (Z-A)</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Table */}

@@ -392,11 +392,13 @@ function AttendanceTableComponent() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Courses</SelectItem>
-                {courses?.map((course) => (
-                  <SelectItem key={course} value={course}>
-                    {course}
-                  </SelectItem>
-                ))}
+                {courses
+                  ?.filter((course) => course && course.trim() !== "")
+                  .map((course) => (
+                    <SelectItem key={course} value={course}>
+                      {course}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
             <Select value={batchFilter} onValueChange={setBatchFilter}>
@@ -405,11 +407,13 @@ function AttendanceTableComponent() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Batches</SelectItem>
-                {batches?.map((batch) => (
-                  <SelectItem key={batch} value={batch}>
-                    {batch}
-                  </SelectItem>
-                ))}
+                {batches
+                  ?.filter((batch) => batch && batch.trim() !== "")
+                  .map((batch) => (
+                    <SelectItem key={batch} value={batch}>
+                      {batch}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
             <Select
