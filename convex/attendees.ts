@@ -127,15 +127,18 @@ export const bulkImport = mutation({
         batch: v.string(),
         shift: v.optional(v.string()),
         contactNo: v.optional(v.string()),
+        isPresent: v.optional(v.boolean()),
       }),
     ),
   },
   handler: async (ctx, args) => {
     const ids = [];
     for (const attendee of args.attendees) {
+      const { isPresent, ...rest } = attendee;
       const id = await ctx.db.insert("attendees", {
-        ...attendee,
-        isPresent: false,
+        ...rest,
+        isPresent: isPresent ?? false,
+        checkedInAt: isPresent ? Date.now() : undefined,
       });
       ids.push(id);
     }

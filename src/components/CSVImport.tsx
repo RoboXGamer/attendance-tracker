@@ -53,6 +53,7 @@ function CSVImportComponent() {
       batch: string;
       shift?: string;
       contactNo?: string;
+      isPresent?: boolean;
     }>
   >([]);
   const [importing, setImporting] = useState(false);
@@ -117,11 +118,41 @@ function CSVImportComponent() {
       (h) =>
         h.includes("contact") || h.includes("phone") || h.includes("mobile"),
     );
+    const presentIdx = headers.findIndex(
+      (h) =>
+        h.includes("present") ||
+        h.includes("attendance") ||
+        h.includes("status"),
+    );
 
     if (nameIdx === -1 || courseIdx === -1 || batchIdx === -1) {
       alert("CSV must have 'name', 'course', and 'batch' columns");
       return [];
     }
+
+    const parsePresentValue = (
+      value: string | undefined,
+    ): boolean | undefined => {
+      if (value === undefined || value === "") return undefined;
+      const lower = value.toLowerCase().trim();
+      if (
+        lower === "true" ||
+        lower === "yes" ||
+        lower === "1" ||
+        lower === "present"
+      ) {
+        return true;
+      }
+      if (
+        lower === "false" ||
+        lower === "no" ||
+        lower === "0" ||
+        lower === "absent"
+      ) {
+        return false;
+      }
+      return undefined;
+    };
 
     const data = [];
     for (let i = 1; i < lines.length; i++) {
@@ -133,6 +164,8 @@ function CSVImportComponent() {
           batch: cols[batchIdx] || "",
           shift: shiftIdx !== -1 ? cols[shiftIdx] : undefined,
           contactNo: contactIdx !== -1 ? cols[contactIdx] : undefined,
+          isPresent:
+            presentIdx !== -1 ? parsePresentValue(cols[presentIdx]) : undefined,
         });
       }
     }
