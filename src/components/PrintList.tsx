@@ -59,27 +59,7 @@ type Attendee = {
 // Normalize course name for grouping
 const normalizeCourse = (course: string): string => {
   if (!course) return "UNKNOWN";
-  let normalized = course.trim().toUpperCase();
-  normalized = normalized.replace(/\s+/g, " ");
-  normalized = normalized.replace(/\s*\(\s*/g, " (").replace(/\s*\)\s*/g, ")");
-
-  const mappings: Record<string, string> = {
-    BBA: "BBA (G)",
-    "BBA (G)": "BBA (G)",
-    "BBA GENERAL": "BBA (G)",
-    "BBA (B&I)": "BBA (B&I)",
-    "BCOM (HONS.)": "B.COM (HONS.)",
-    "BCOM (HONS)": "B.COM (HONS.)",
-    "BCOM HONS": "B.COM (HONS.)",
-    "B.ED.": "B.ED.",
-    "B.ED": "B.ED.",
-    "B. ED": "B.ED.",
-    "B. ED.": "B.ED.",
-    "BCA (E)": "BCA",
-    "BIS (HONS)": "BIS (HONS.)",
-    "BIS (HONS.)": "BIS (HONS.)",
-  };
-  return mappings[normalized] || normalized;
+  return course.trim().toUpperCase().replace(/\s+/g, " ");
 };
 
 // Normalize batch year from various formats

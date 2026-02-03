@@ -43,6 +43,7 @@ import {
   Loader2,
   Filter,
 } from "lucide-react";
+import Papa from "papaparse";
 
 function CSVImportComponent() {
   const [csvData, setCsvData] = useState<string>("");
@@ -95,32 +96,7 @@ function CSVImportComponent() {
   // Normalize course name for grouping
   const normalizeCourse = (course: string): string => {
     if (!course) return "UNKNOWN";
-    let normalized = course.trim().toUpperCase();
-    // Remove extra spaces
-    normalized = normalized.replace(/\s+/g, " ");
-    // Normalize parentheses spacing: "BBA (G)" or "BBA(G)" -> "BBA (G)"
-    normalized = normalized
-      .replace(/\s*\(\s*/g, " (")
-      .replace(/\s*\)\s*/g, ")");
-
-    // Handle common variations (mappings checked AFTER normalization)
-    const mappings: Record<string, string> = {
-      BBA: "BBA (G)",
-      "BBA (G)": "BBA (G)",
-      "BBA GENERAL": "BBA (G)",
-      "BBA (B&I)": "BBA (B&I)",
-      "BCOM (HONS.)": "B.COM (HONS.)",
-      "BCOM (HONS)": "B.COM (HONS.)",
-      "BCOM HONS": "B.COM (HONS.)",
-      "B.ED.": "B.ED.",
-      "B.ED": "B.ED.",
-      "B. ED": "B.ED.",
-      "B. ED.": "B.ED.",
-      "BCA (E)": "BCA",
-      "BIS (HONS)": "BIS (HONS.)",
-      "BIS (HONS.)": "BIS (HONS.)",
-    };
-    return mappings[normalized] || normalized;
+    return course.trim().toUpperCase().replace(/\s+/g, " ");
   };
 
   // Course-wise count (only present students, with normalized names)
@@ -190,30 +166,41 @@ function CSVImportComponent() {
   };
 
   const parseCSV = (text: string) => {
-    const lines = text.trim().split("\n");
-    if (lines.length < 2) return [];
+    const result = Papa.parse(text, {
+      header: true,
+      skipEmptyLines: true,
+      transformHeader: (header) => header.trim().toLowerCase(),
+    });
 
-    const headers = lines[0].split(",").map((h) => h.trim().toLowerCase());
-    const nameIdx = headers.findIndex((h) => h.includes("name"));
-    const courseIdx = headers.findIndex(
+    if (result.errors.length > 0) {
+      alert("CSV parsing error: " + result.errors[0].message);
+      return [];
+    }
+
+    const data = result.data as any[];
+    if (data.length === 0) return [];
+
+    const headers = Object.keys(data[0]);
+    const nameKey = headers.find((h) => h.includes("name"));
+    const courseKey = headers.find(
       (h) => h.includes("course") || h.includes("program"),
     );
-    const batchIdx = headers.findIndex(
+    const batchKey = headers.find(
       (h) => h.includes("batch") || h.includes("year"),
     );
-    const shiftIdx = headers.findIndex((h) => h.includes("shift"));
-    const contactIdx = headers.findIndex(
+    const shiftKey = headers.find((h) => h.includes("shift"));
+    const contactKey = headers.find(
       (h) =>
         h.includes("contact") || h.includes("phone") || h.includes("mobile"),
     );
-    const presentIdx = headers.findIndex(
+    const presentKey = headers.find(
       (h) =>
         h.includes("present") ||
         h.includes("attendance") ||
         h.includes("status"),
     );
 
-    if (nameIdx === -1 || courseIdx === -1 || batchIdx === -1) {
+    if (!nameKey || !courseKey || !batchKey) {
       alert("CSV must have 'name', 'course', and 'batch' columns");
       return [];
     }
@@ -242,22 +229,22 @@ function CSVImportComponent() {
       return undefined;
     };
 
-    const data = [];
-    for (let i = 1; i < lines.length; i++) {
-      const cols = lines[i].split(",").map((c) => c.trim());
-      if (cols[nameIdx]) {
-        data.push({
-          fullName: cols[nameIdx],
-          course: cols[courseIdx] || "",
-          batch: cols[batchIdx] || "",
-          shift: shiftIdx !== -1 ? cols[shiftIdx] : undefined,
-          contactNo: contactIdx !== -1 ? cols[contactIdx] : undefined,
-          isPresent:
-            presentIdx !== -1 ? parsePresentValue(cols[presentIdx]) : undefined,
+    const parsedData = [];
+    for (const row of data) {
+      if (row[nameKey]) {
+        parsedData.push({
+          fullName: row[nameKey],
+          course: row[courseKey] || "",
+          batch: row[batchKey] || "",
+          shift: shiftKey ? row[shiftKey] : undefined,
+          contactNo: contactKey ? row[contactKey] : undefined,
+          isPresent: presentKey
+            ? parsePresentValue(row[presentKey])
+            : undefined,
         });
       }
     }
-    return data;
+    return parsedData;
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
