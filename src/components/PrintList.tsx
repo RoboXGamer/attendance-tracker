@@ -33,6 +33,7 @@ import {
   Users,
   Loader2,
 } from "lucide-react";
+import Papa from "papaparse";
 import {
   useReactTable,
   getCoreRowModel,
@@ -451,6 +452,47 @@ function PrintListComponent() {
     }
   };
 
+  // Export to CSV function
+  const handleExportCSV = () => {
+    // Use sorted data, then filter by selection if needed
+    const dataToExport =
+      selectedCount > 0
+        ? sortedDataForExport.filter((a) =>
+            selectedRows.some((row) => row.original._id === a._id),
+          )
+        : sortedDataForExport;
+
+    if (dataToExport.length === 0) {
+      alert("No data to export");
+      return;
+    }
+
+    // Prepare data for CSV
+    const csvData = dataToExport.map((attendee, index) => ({
+      "#": index + 1,
+      "Full Name": attendee.fullName,
+      "Course": normalizeCourse(attendee.course),
+      "Shift": attendee.shift || "-",
+      "Batch": formatBatchYear(attendee.batch),
+      "Contact No.": attendee.contactNo || "-",
+      "Status": attendee.isPresent ? "Present" : "Absent",
+    }));
+
+    // Generate CSV string
+    const csv = Papa.unparse(csvData);
+
+    // Create and download file
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `attendance_list_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   // Portal target for stats in header
   const [statsPortal, setStatsPortal] = useState<HTMLElement | null>(null);
 
@@ -599,12 +641,20 @@ function PrintListComponent() {
                   : `${totalCount} attendees`}
               </span>
             </div>
-            <Button onClick={handleExportPDF} size="sm" className="gap-2">
-              <FileDown className="h-4 w-4" />
-              {selectedCount > 0
-                ? `Export ${selectedCount} to PDF`
-                : "Export All to PDF"}
-            </Button>
+            <div className="flex gap-2">
+              <Button onClick={handleExportPDF} size="sm" className="gap-2">
+                <FileDown className="h-4 w-4" />
+                {selectedCount > 0
+                  ? `Export ${selectedCount} to PDF`
+                  : "Export All to PDF"}
+              </Button>
+              <Button onClick={handleExportCSV} variant="outline" size="sm" className="gap-2">
+                <FileDown className="h-4 w-4" />
+                {selectedCount > 0
+                  ? `Export ${selectedCount} to CSV`
+                  : "Export All to CSV"}
+              </Button>
+            </div>
           </div>
           <Table>
             <TableHeader>
